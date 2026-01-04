@@ -1,0 +1,15 @@
+[package]
+name = "oasis-renderer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wgpu = "28.0.0"
+#winit = { version = "0.30", features = ["rwh_06"] }
+#egui = "0.33.3"
+#egui-winit = "0.33.3"
+#egui-wgpu = "0.33.3"
+pollster = "0.4.0"
+rayon = "1.11.0"
+bytemuck = { version = "1.24.0", features = ["derive"] }
+approx = "0.5.1"
