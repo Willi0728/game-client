@@ -2,7 +2,7 @@ use std::sync::mpsc;
 use bytemuck::{Pod, Zeroable};
 use rayon::prelude::*;
 use wgpu::{util::DeviceExt, Device, Queue};
-
+//TODO implement triangles
 type RotationMatrix = [[f32; 4]; 4];
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub(crate) struct Point2D { x: f32, y: f32 }
@@ -13,7 +13,18 @@ struct Rotation3D { pitch: f32, yaw: f32, roll: f32, }
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable, Default, PartialEq)]
 struct GpuInput { x: f32, y: f32, z: f32, w: f32}
-
+#[derive(Debug, Clone, Copy)]
+struct Triangle3D {
+    a: Point3D,
+    b: Point3D,
+    c: Point3D,
+}
+#[derive(Debug, Clone, Copy)]
+struct Triangle2D {
+    a: Point2D,
+    b: Point2D,
+    c: Point2D
+}
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct GpuProjectUniform {
@@ -144,6 +155,31 @@ impl Default for ProjectionOptions {
         }
     }
 }
+impl Triangle3D {
+    pub fn new(a: Point3D, b: Point3D, c: Point3D) -> Self {
+        Self { a, b, c }
+    }
+    pub fn vertices(&self) -> [Point3D; 3] {
+        [self.a, self.b, self.c]
+    }
+    pub fn project(
+        &self,
+        mat: RotationMatrix,
+        camera: &Camera,
+        proj: &ProjectionOptions,
+    ) -> Result<Triangle2D, Error> {
+        project_triangle(mat, camera, self, proj)
+    }
+}
+
+impl Triangle2D {
+    pub fn new(a: Point2D, b: Point2D, c: Point2D) -> Self {
+        Self { a, b, c }
+    }
+    pub fn vertices(&self) -> [Point2D; 3] {
+        [self.a, self.b, self.c]
+    }
+}
 impl ProjectionDevice {
     pub(crate) fn project(&self, camera: &Camera, positions: &[Point3D], proj: &ProjectionOptions) -> Vec<Option<Point2D>> {
         match self {
@@ -231,6 +267,14 @@ pub(crate) fn project(mat: RotationMatrix, camera: &Camera, position: &Point3D, 
     let px = (focal / proj.aspect) * (cx / cz);
     let py = focal * (cy / cz);
     Ok( Point2D { x: px * proj.screen_width as f32 / 2.0, y: py * proj.screen_height as f32 / 2.0 } )
+}
+
+pub(crate) fn project_triangle(mat: RotationMatrix, camera: &Camera, triangle: &Triangle3D, proj: &ProjectionOptions) -> Result<Triangle2D, Error> {
+    Ok(Triangle2D {
+        a: project(mat, camera, &triangle.a, proj)?,
+        b: project(mat, camera, &triangle.b, proj)?,
+        c: project(mat, camera, &triangle.c, proj)?
+    })
 }
 
 fn dispatch_gpu_projection(
@@ -374,7 +418,7 @@ fn gpu_copy_roundtrip(device: &Device, queue: &Queue, payload: &[GpuInput]) -> R
 
 #[cfg(test)]
 mod tests {
-    use crate::Camera;
+    use crate::projector::Camera;
     use super::*;
     use std::mem::{align_of, size_of};
     use approx::assert_abs_diff_eq;
@@ -382,7 +426,12 @@ mod tests {
     fn request_test_device() -> Option<(Device, Queue)> {
         let instance = wgpu::Instance::default();
         let adapter = match pollster::block_on(
-            instance.request_adapter(&wgpu::RequestAdapterOptions::default()),
+            instance.request_adapter(
+                //TODO
+                // note to future self: if something is lagging, try this.
+                // power_preference: wgpu::PowerPreference::HighPerformance
+                &wgpu::RequestAdapterOptions::default()
+            ),
         ) {
             Ok(adapter) => adapter,
             Err(err) => {
