@@ -147,6 +147,21 @@ impl GpuOptions {
 
 impl Point2D { fn from(x: f32, y: f32) -> Self { Self { x, y } } }
 impl Point3D { fn from(x: f32, y: f32, z: f32) -> Self { Self { x, y, z } } }
+impl From<Point3D> for GpuInput {
+    fn from(v: Point3D) -> Self {
+        GpuInput { x: v.x, y: v.y, z: v.z, w: 1.0 }
+    }
+}
+impl From<GpuInput> for Point3D {
+    fn from(v: GpuInput) -> Self {
+        Point3D { x: v.x, y: v.y, z: v.z }
+    }
+}
+impl From<GpuProjectOutput> for Point2D {
+    fn from(value: GpuProjectOutput) -> Self {
+        Point2D { x: value.x, y: value.y }
+    }
+}
 impl Default for ProjectionOptions {
     fn default() -> Self {
         Self {
@@ -448,6 +463,31 @@ mod tests {
         }
     }
 
+    fn generate_test_points() -> Vec<Point3D> {
+        (0..256)
+            .map(|i| {
+                Point3D::from(
+                    i as f32 * 0.1,
+                    (i as f32 * 0.2).sin(),
+                    1.0 + (i % 5) as f32,
+                )
+            })
+            .collect()
+    }
+
+    fn generate_test_points_as_gpu_inputs() -> Vec<GpuInput> {
+        (0..256)
+            .map(|i| {
+                Point3D::from(
+                    i as f32 * 0.1,
+                    (i as f32 * 0.2).sin(),
+                    1.0 + (i % 5) as f32,
+                ).into()
+            })
+            .collect()
+    }
+
+
     #[test]
     pub fn camera_forward_is_screen_center () {
         assert_eq!(
@@ -554,16 +594,12 @@ mod tests {
         //     GpuInput { x: 1.0, y: 2.0, z: 3.0, w: 4.0 },
         //     GpuInput { x: 5.5, y: -6.5, z: 7.25, w: -8.25, },
         // ];
-        let mut payload = Vec::new();
-        for i in 0..256 {
-            payload.push(GpuInput {
-                x: i as f32 * 0.1,
-                y: (i as f32 * 0.2).sin(),
-                z: 1.0 + (i % 5) as f32,
-                w: 0.0
-            });
-        }
-        let result = gpu_copy_roundtrip(&device, &queue, payload.as_slice()).expect("roundtrip");
+        let payload = generate_test_points();
+        let result: Vec<Point3D> = gpu_copy_roundtrip(&device, &queue, &generate_test_points_as_gpu_inputs())
+            .expect("roundtrip")
+            .into_iter()
+            .map(|p| p.into())
+            .collect();
         assert_eq!(result, payload.to_vec());
     }
 
@@ -575,14 +611,7 @@ mod tests {
         let gpu_device = ProjectionDevice::Gpu(GpuOptions::new(device.clone(), queue.clone()));
         let cpu_device = ProjectionDevice::Cpu;
         let camera = Camera::default();
-        let mut points = Vec::new();
-        for i in 0..256 {
-            points.push(Point3D::from(
-                i as f32 * 0.1,
-                (i as f32 * 0.2).sin(),
-                1.0 + (i % 5) as f32,
-            ));
-        }
+        let points = generate_test_points();
         let options = ProjectionOptions {
             fov: 1.5,
             ..ProjectionOptions::default()
@@ -604,5 +633,11 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    pub fn triangles_behave_same_as_points () {
+        let points = generate_test_points();
+
     }
 }
