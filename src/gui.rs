@@ -32,6 +32,7 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &Context, frame: &mut eframe::Frame) {
         CentralPanel::default().show(ctx, |ui| {
+            ctx.input(|i| i.zoom_delta());
             ui.heading("Hello, world!");
             self.counter += 1;
             ui.label(self.counter.to_string());
