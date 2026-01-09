@@ -14,13 +14,13 @@ struct Rotation3D { pitch: f32, yaw: f32, roll: f32, }
 #[derive(Debug, Copy, Clone, Pod, Zeroable, Default, PartialEq)]
 struct GpuInput { x: f32, y: f32, z: f32, w: f32}
 #[derive(Debug, Clone, Copy)]
-struct Triangle3D {
+pub(crate) struct Triangle3D {
     a: Point3D,
     b: Point3D,
     c: Point3D,
 }
 #[derive(Debug, Clone, Copy)]
-struct Triangle2D {
+pub(crate) struct Triangle2D {
     a: Point2D,
     b: Point2D,
     c: Point2D
@@ -171,13 +171,13 @@ impl Default for ProjectionOptions {
     }
 }
 impl Triangle3D {
-    pub fn new(a: Point3D, b: Point3D, c: Point3D) -> Self {
+    pub(crate) fn new(a: Point3D, b: Point3D, c: Point3D) -> Self {
         Self { a, b, c }
     }
-    pub fn vertices(&self) -> [Point3D; 3] {
+    pub(crate) fn vertices(&self) -> [Point3D; 3] {
         [self.a, self.b, self.c]
     }
-    pub fn project(
+    pub(crate) fn project(
         &self,
         mat: RotationMatrix,
         camera: &Camera,
@@ -185,14 +185,38 @@ impl Triangle3D {
     ) -> Result<Triangle2D, Error> {
         project_triangle(mat, camera, self, proj)
     }
+    pub(crate) fn pack(triangles: &[Triangle3D]) -> Vec<Point3D> {
+        let mut points: Vec<Point3D> = Vec::with_capacity(triangles.len() * 3);
+        for tri in triangles {
+            points.push(tri.a);
+            points.push(tri.b);
+            points.push(tri.c);
+        }
+        points
+    }
+    pub(crate) fn unpack(points: &[Point3D]) -> Vec<Triangle3D> {
+        points.chunks_exact(3).map(|a| Triangle3D { a: a[0], b: a[1], c: a[2] }).collect()
+    }
 }
 
 impl Triangle2D {
-    pub fn new(a: Point2D, b: Point2D, c: Point2D) -> Self {
+    pub(crate) fn new(a: Point2D, b: Point2D, c: Point2D) -> Self {
         Self { a, b, c }
     }
-    pub fn vertices(&self) -> [Point2D; 3] {
+    pub(crate) fn vertices(&self) -> [Point2D; 3] {
         [self.a, self.b, self.c]
+    }
+    pub(crate) fn pack(triangles: &[Triangle2D]) -> Vec<Point2D> {
+        let mut points: Vec<Point2D> = Vec::with_capacity(triangles.len() * 3);
+        for tri in triangles {
+            points.push(tri.a);
+            points.push(tri.b);
+            points.push(tri.c);
+        }
+        points
+    }
+    pub(crate) fn unpack(points: &[Point2D]) -> Vec<Triangle2D> {
+        points.chunks_exact(3).map(|a| Triangle2D { a: a[0], b: a[1], c: a[2] }).collect()
     }
 }
 impl ProjectionDevice {
@@ -464,7 +488,7 @@ mod tests {
     }
 
     fn generate_test_points() -> Vec<Point3D> {
-        (0..256)
+        (0..255)
             .map(|i| {
                 Point3D::from(
                     i as f32 * 0.1,
@@ -476,7 +500,7 @@ mod tests {
     }
 
     fn generate_test_points_as_gpu_inputs() -> Vec<GpuInput> {
-        (0..256)
+        (0..255)
             .map(|i| {
                 Point3D::from(
                     i as f32 * 0.1,
@@ -636,8 +660,8 @@ mod tests {
     }
 
     #[test]
-    pub fn triangles_behave_same_as_points () {
+    pub fn triangle_conversion_is_correct () {
         let points = generate_test_points();
-
+        assert_eq!(points, Triangle3D::pack(&*Triangle3D::unpack(points.as_slice())));
     }
 }
