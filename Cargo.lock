@@ -1946,6 +1946,7 @@ dependencies = [
  "rayon",
  "serde",
  "wasm-bindgen-futures",
+ "web-sys",
  "wgpu 28.0.0",
 ]
 

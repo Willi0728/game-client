@@ -1,8 +1,8 @@
 use std::sync::mpsc;
 use bytemuck::{Pod, Zeroable};
 use rayon::prelude::*;
-use wgpu::{util::DeviceExt, Device, Queue};
-//TODO implement triangles
+use wgpu::{util::DeviceExt, Device, Queue, RequestAdapterError, RequestAdapterOptions, RequestDeviceError};
+
 type RotationMatrix = [[f32; 4]; 4];
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub(crate) struct Point2D { x: f32, y: f32 }
@@ -75,7 +75,18 @@ pub(crate) enum Error {
     PointTooClose,
     PointTooFar
 }
+#[derive(Debug)]
+pub(crate) enum GpuError {
+    Adapter(RequestAdapterError),
+    Device(RequestDeviceError)
+}
+impl From<RequestAdapterError> for GpuError {
+    fn from(e: RequestAdapterError) -> Self { GpuError::Adapter(e) }
+}
 
+impl From<RequestDeviceError> for GpuError {
+    fn from(e: RequestDeviceError) -> Self { GpuError::Device(e) }
+}
 impl GpuOptions {
     pub(crate) fn new(device: Device, queue: Queue) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -143,6 +154,22 @@ impl GpuOptions {
             pipeline,
         }
     }
+    pub fn default() -> Result<Self, GpuError> {
+        let instance = wgpu::Instance::default();
+
+        let adapter = pollster::block_on(
+            instance.request_adapter(&RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                ..RequestAdapterOptions::default()
+            }),
+        )?;
+
+        let (device, queue) =
+            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))?;
+
+        Ok(Self::new(device, queue))
+    }
+
 }
 
 impl Point2D { fn from(x: f32, y: f32) -> Self { Self { x, y } } }
@@ -466,9 +493,10 @@ mod tests {
         let instance = wgpu::Instance::default();
         let adapter = match pollster::block_on(
             instance.request_adapter(
-                //TODO
-                // note to future self: if something is lagging, try this.
-                // power_preference: wgpu::PowerPreference::HighPerformance
+                /*TODO
+                    note to future self: if something is lagging, try this.
+                    power_preference: wgpu::PowerPreference::HighPerformance,
+                */
                 &wgpu::RequestAdapterOptions::default()
             ),
         ) {
