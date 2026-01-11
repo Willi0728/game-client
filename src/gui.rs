@@ -1,6 +1,6 @@
-use std::time::Duration;
 use eframe::CreationContext;
 use egui::{CentralPanel, Context, TopBottomPanel};
+use std::time::Duration;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -33,16 +33,15 @@ impl eframe::App for App {
         ctx.input(|i| {
             let zoom_delta = i.zoom_delta();
             if zoom_delta != 1.0 {
-                let new_zoom = (ctx.zoom_factor() * zoom_delta)
-                    .clamp(0.5, 2.0);
+                let new_zoom = (ctx.zoom_factor() * zoom_delta).clamp(0.5, 2.0);
                 ctx.set_zoom_factor(new_zoom);
             }
         });
 
         CentralPanel::default().show(ctx, |ui| {
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    ui.label("FOV: ");
-                    ui.add(egui::DragValue::new(&mut self.fov).speed(0.01));
+                ui.label("FOV: ");
+                ui.add(egui::DragValue::new(&mut self.fov).speed(0.01));
             });
         });
         ctx.request_repaint_after(Duration::from_secs_f64(1.0 / 60.0))

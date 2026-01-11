@@ -18,3 +18,12 @@ serde = { version = "1.0.228", features = ["derive"] }
 wasm-bindgen-futures = { version = "0.4.56" }
 log = "0.4.29"
 web-sys = "0.3.83"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
